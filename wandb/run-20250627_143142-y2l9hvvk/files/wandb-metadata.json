@@ -1,0 +1,47 @@
+{
+  "os": "Linux-5.15.0-139-generic-x86_64-with-glibc2.31",
+  "python": "CPython 3.10.16",
+  "startedAt": "2025-06-27T07:31:42.614416Z",
+  "args": [
+    "-opt",
+    "Under_Water/Options/underwater.yml"
+  ],
+  "program": "/home/linhdang/workspace/kien_workspace/underwater/underwater/basicsr/train.py",
+  "codePath": "basicsr/train.py",
+  "git": {
+    "remote": "https://github.com/kien262004/underwater.git",
+    "commit": "0fa1cf93a6c0d4efbce42501e5d51cac8a9c6cbc"
+  },
+  "email": "banalaxis93@gmail.com",
+  "root": "/home/linhdang/workspace/kien_workspace/underwater/underwater",
+  "host": "linhdang-System-Product-Name",
+  "executable": "/home/linhdang/anaconda3/envs/underwater/bin/python",
+  "codePathLocal": "basicsr/train.py",
+  "cpu_count": 14,
+  "cpu_count_logical": 20,
+  "gpu": "NVIDIA GeForce RTX 4070",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "489593511936",
+      "used": "460531675136"
+    }
+  },
+  "memory": {
+    "total": "67151044608"
+  },
+  "cpu": {
+    "count": 14,
+    "countLogical": 20
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA GeForce RTX 4070",
+      "memoryTotal": "12878610432",
+      "cudaCores": 5888,
+      "architecture": "Ada",
+      "uuid": "GPU-a3894bd2-c197-6d3b-b9ed-e10c8af9b35e"
+    }
+  ],
+  "cudaVersion": "12.3"
+}
