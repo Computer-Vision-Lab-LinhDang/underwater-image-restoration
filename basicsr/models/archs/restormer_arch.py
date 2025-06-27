@@ -189,7 +189,8 @@ class Downsample(nn.Module):
     def __init__(self, n_feat):
         super(Downsample, self).__init__()
 
-        self.body = nn.Sequential(nn.Conv2d(n_feat, n_feat//2, kernel_size=3, stride=1, padding=1, bias=False),
+        self.body = nn.Sequential(nn.Conv2d(n_feat, n_feat, kernel_size=3, stride=1, padding=1, bias=False, groups=n_feat),
+                                  nn.Conv2d(n_feat, n_feat//2, kernel_size=1, stride=1, bias=False),
                                   nn.PixelUnshuffle(2))
 
     def forward(self, x):
@@ -199,7 +200,7 @@ class Upsample(nn.Module):
     def __init__(self, n_feat):
         super(Upsample, self).__init__()
 
-        self.body = nn.Sequential(nn.Conv2d(n_feat, n_feat, kernel_size=3, stride=1, padding=1, bias=False),
+        self.body = nn.Sequential(nn.Conv2d(n_feat, n_feat, kernel_size=3, stride=1, padding=1, bias=False, groups=n_feat),
                                   nn.Conv2d(n_feat, 2*n_feat, kernel_size=1, stride=1, bias=False),
                                   nn.PixelShuffle(2))
 
@@ -266,20 +267,52 @@ class HighFrequencyBlock(nn.Module):
     ):
         super(HighFrequencyBlock, self).__init__()
         self.fuse_conv = nn.Sequential(*[
-            nn.Conv2d(channels*3, channels, 1),
-            # nn.Conv2d(channels, channels, 3, 1, 1)
+            nn.Conv2d(channels*3, channels, kernel_size=1),
+            nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1, groups=channels),
+            nn.Conv2d(channels, channels, kernel_size=1)
         ])
         self.attn = Attention(channels, num_heads, bias)
         self.split_conv  = nn.Sequential(*[
-            # nn.Conv2d(channels, channels, 3, 1, 1),
-            nn.Conv2d(channels, channels*3, 1)
+            nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1, groups=channels),
+            nn.Conv2d(channels, channels*3, kernel_size=1)
         ])
     
     def forward(self, x):
         b, c, n, h, w = x.shape
         x = rearrange(x, 'b c n h w -> b (c n) h w')
         x = self.fuse_conv(x)
-        x = self.attn(x)
+        x = x + self.attn(x)
+        x = self.split_conv(x)
+        out = rearrange(x, 'b (c n) h w -> b c n h w', n = n)  # đúng shape (B, C, 3, H, W)
+        return out
+    
+class HighFrequencyBlock_02(nn.Module):
+    def __init__(self,
+        channels,     
+        num_heads=8,
+        bias=True
+    ):
+        super(HighFrequencyBlock_02, self).__init__()
+        self.fuse_conv = nn.Sequential(*[
+            nn.Conv2d(channels*3, channels, kernel_size=1),
+            nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1, groups=channels),
+            nn.Conv2d(channels, channels, kernel_size=1)
+        ])
+        self.attn = nn.Sequential(*[
+            nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1, groups=channels),
+            nn.Conv2d(channels, channels, kernel_size=1),
+            nn.Sigmoid()
+        ])
+        self.split_conv  = nn.Sequential(*[
+            nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1, groups=channels),
+            nn.Conv2d(channels, channels*3, kernel_size=1)
+        ])
+    
+    def forward(self, x):
+        b, c, n, h, w = x.shape
+        x = rearrange(x, 'b c n h w -> b (c n) h w')
+        x = self.fuse_conv(x)
+        x = x * self.attn(x)
         x = self.split_conv(x)
         out = rearrange(x, 'b (c n) h w -> b c n h w', n = n)  # đúng shape (B, C, 3, H, W)
         return out
@@ -290,7 +323,7 @@ class DWTBlock(nn.Module):
         self.norm = LayerNorm(channels, LayerNorm_type)
         self.xfm = DWTForward(J=1, mode='zero', wave='haar')   # DWT
         self.ifm = DWTInverse(mode='zero', wave='haar')        # IDWT
-        self.high_branch = HighFrequencyBlock(channels, num_heads, bias)
+        # self.high_branch = HighFrequencyBlock_02(channels, num_heads, bias)
         self.low_branch = LowFrequencyBlock(channels)
         self.prj_conv = nn.Conv2d(channels, channels, 1)
         
@@ -298,9 +331,9 @@ class DWTBlock(nn.Module):
     def forward(self, x):
         x = self.norm(x)
         x_low, x_high  = self.xfm(x)
-        out_high = self.high_branch(x_high[0])
+        # out_high = self.high_branch(x_high[0])
         out_low = self.low_branch(x_low)
-        out = self.ifm((out_low, [out_high]))
+        out = self.ifm((out_low, x_high))
         out = self.prj_conv(out)
         out = out + x
         return out
@@ -312,13 +345,14 @@ class SCFNBlock(nn.Module): # ref: Mishra_U-ENHANCE_Underwater_Image_Enhancement
         self.norm = LayerNorm(channels, LayerNorm_type)
         self.prj_conv1 = nn.Conv2d(channels, hidden_channels, 1)
         self.conv = nn.Conv2d(hidden_channels, hidden_channels, 3, 1, 1, groups=hidden_channels)
-        self.act = nn.Sigmoid()
+        self.act = nn.GELU()
         self.prj_conv2 = nn.Conv2d(hidden_channels, channels, 1)
     
     def forward(self, x):
         out = self.norm(x)
-        out = self.conv(self.prj_conv1(out))
-        out = self.act(out) * out
+        out = self.prj_conv1(out)
+        out1 = self.conv(out)
+        out = self.act(out1) * out
         out = self.prj_conv2(out) + x
         return out
 
@@ -338,7 +372,7 @@ class Block(nn.Module):
         out = self.dwtblock(x)
         out = self.refine(x)
         return out
-
+    
 class WFUWNet(nn.Module):
     def __init__(self, 
         inp_channels=3,
@@ -404,6 +438,6 @@ if __name__ == '__main__':
     img = torch.randn((1, 3, 512, 512))
 
     model = WFUWNet()
-
+    print(model(img).shape)
     total_params = sum(p.numel() for p in model.parameters())
     print(f'Tổng số tham số: {total_params}')
