@@ -222,11 +222,11 @@ def main():
     scale = opt['scale']
 
     epoch = start_epoch
+    losses_log = {}
     while current_iter <= total_iters:
         train_sampler.set_epoch(epoch)
         prefetcher.reset()
         train_data = prefetcher.next()
-
         while train_data is not None:
             data_time = time.time() - data_time
 
@@ -273,14 +273,24 @@ def main():
             model.feed_train_data({'lq': lq, 'gt':gt})
             model.optimize_parameters(current_iter)
 
+            for key, value in model.get_current_log().items():
+                if key not in losses_log:
+                    losses_log[key] = value
+                else:
+                    losses_log[key] += value
+            
             iter_time = time.time() - iter_time
             # log
             if current_iter % opt['logger']['print_freq'] == 0:
                 log_vars = {'epoch': epoch, 'iter': current_iter}
                 log_vars.update({'lrs': model.get_current_learning_rate()})
                 log_vars.update({'time': iter_time, 'data_time': data_time})
-                log_vars.update(model.get_current_log())
+                for key, value in losses_log.items():
+                    log_vars[key] = value / opt['logger']['print_freq']
+                log_vars.update(losses_log)
                 msg_logger(log_vars)
+                # reset log
+                losses_log = {}
 
             # save models and training states
             if current_iter % opt['logger']['save_checkpoint_freq'] == 0:

@@ -2,10 +2,12 @@ import torch
 from torch import nn as nn
 from torch.nn import functional as F
 import numpy as np
+from torchvision import models, transforms
 
 from basicsr.models.losses.loss_util import weighted_loss
 
 _reduction_modes = ['none', 'mean', 'sum']
+
 
 
 @weighted_loss
@@ -124,6 +126,7 @@ class CharbonnierLoss(nn.Module):
 class EdgeLoss(nn.Module):
     
     def __init__(self, loss_weight=1.0, reduction='mean'):
+        super(EdgeLoss, self).__init__()
         if reduction not in ['none', 'mean', 'sum']:
             raise ValueError(f'Unsupported reduction mode: {reduction}. '
                              f'Supported ones are: {_reduction_modes}')
@@ -136,9 +139,127 @@ class EdgeLoss(nn.Module):
         self.eps = 1e-3
     
     def forward(self, pred, gt):
+        if self.laplace_kernel.device != pred.device:
+            self.laplace_kernel = self.laplace_kernel.to(pred.device)
         laplace_pred = F.conv2d(pred, self.laplace_kernel, padding=1, groups=3)
         laplace_gt = F.conv2d(gt, self.laplace_kernel, padding=1, groups=3)
         diff = laplace_pred - laplace_gt
         loss = torch.mean(torch.sqrt((diff * diff) + (self.eps * self.eps)))
         
         return loss
+    
+class VGGLoss(nn.Module):
+    """Computes the VGG perceptual loss between two batches of images.
+
+    The input and target must be 4D tensors with three channels
+    ``(B, 3, H, W)`` and must have equivalent shapes. Pixel values should be
+    normalized to the range 0–1.
+
+    The VGG perceptual loss is the mean squared difference between the features
+    computed for the input and target at layer :attr:`layer` (default 8, or
+    ``relu2_2``) of the pretrained model specified by :attr:`model` (either
+    ``'vgg16'`` (default) or ``'vgg19'``).
+
+    If :attr:`shift` is nonzero, a random shift of at most :attr:`shift`
+    pixels in both height and width will be applied to all images in the input
+    and target. The shift will only be applied when the loss function is in
+    training mode, and will not be applied if a precomputed feature map is
+    supplied as the target.
+
+    :attr:`reduction` can be set to ``'mean'``, ``'sum'``, or ``'none'``
+    similarly to the loss functions in :mod:`torch.nn`. The default is
+    ``'mean'``.
+
+    :meth:`get_features()` may be used to precompute the features for the
+    target, to speed up the case where inputs are compared against the same
+    target over and over. To use the precomputed features, pass them in as
+    :attr:`target` and set :attr:`target_is_features` to :code:`True`.
+
+    Instances of :class:`VGGLoss` must be manually converted to the same
+    device and dtype as their inputs.
+    """
+
+    models = {'vgg16': models.vgg16, 'vgg19': models.vgg19}
+
+    def __init__(self, model='vgg16', layers=[8], shift=0, reduction='mean'):
+        super().__init__()
+        self.shift = shift
+        self.reduction = reduction
+        self.layers = layers
+        self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                              std=[0.229, 0.224, 0.225])
+        self.model = self.models[model](pretrained=True).features[:layers[-1]+1]
+        self.model.eval()
+        self.model.requires_grad_(False)
+
+    def get_features(self, x):
+        features = []
+        for i, layer in enumerate(self.model):
+            x = layer(x)
+            if i in self.layers:
+                features.append(x)
+        return features
+
+    def train(self, mode=True):
+        self.training = mode
+
+    def forward(self, input, target, target_is_features=False):
+        if next(self.model.parameters()).device != input.device:
+            self.model = self.model.to(input.device)
+            self.normalize = self.normalize.to(input.device)
+        if target_is_features:
+            input_feats = self.get_features(input)
+            target_feats = target
+        else:
+            sep = input.shape[0]
+            batch = torch.cat([input, target])
+            if self.shift and self.training:
+                padded = F.pad(batch, [self.shift] * 4, mode='replicate')
+                batch = transforms.RandomCrop(batch.shape[2:])(padded)
+            feats = self.get_features(batch)
+        loss = 0.0
+        for feat in feats:
+            f1, f2 = feat[:sep], feat[sep:]
+            loss += F.mse_loss(f1, f2, reduction=self.reduction)
+        return loss / len(feats)
+    
+class Lambda(nn.Module):
+    """Wraps a callable in an :class:`nn.Module` without registering it."""
+
+    def __init__(self, func):
+        super().__init__()
+        object.__setattr__(self, 'forward', func)
+
+    def extra_repr(self):
+        return getattr(self.forward, '__name__', type(self.forward).__name__) + '()'    
+
+LOSS_REGISTRY = {
+    'L1Loss': L1Loss,
+    'MSELoss': MSELoss,
+    'VGGLoss': VGGLoss,
+    'EdgeLoss': EdgeLoss,
+}
+
+class WeightedLoss(nn.ModuleList):
+    """A weighted combination of multiple loss functions."""
+
+    def __init__(self, losses, weights, verbose=False):
+        super().__init__()
+        for loss_name in losses:
+            loss = LOSS_REGISTRY.get(loss_name)(**losses[loss_name])
+            
+            self.append(loss if isinstance(loss, nn.Module) else Lambda(loss))
+        self.weights = weights
+        self.verbose = verbose
+
+    def _losses_info(self, losses):
+        loss_dict = {type(self[i]).__name__: loss.item() if isinstance(loss, torch.Tensor) else loss for i, loss in enumerate(losses)}
+        return loss_dict
+
+    def forward(self, *args, **kwargs):
+        losses = []
+        for loss, weight in zip(self, self.weights):
+            losses.append(loss(*args, **kwargs) * weight)
+        if self.verbose:
+            return sum(losses), self._losses_info(losses)
+        return sum(losses), None

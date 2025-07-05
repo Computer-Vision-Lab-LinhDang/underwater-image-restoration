@@ -373,6 +373,8 @@ class BaseModel():
 
             log_dict = OrderedDict()
             for name, value in loss_dict.items():
-                log_dict[name] = value.mean().item()
-
+                if  isinstance(value, torch.Tensor):
+                    log_dict[name] = value.mean().item()
+                else:
+                    log_dict[name] = value
             return log_dict

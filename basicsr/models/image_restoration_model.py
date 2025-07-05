@@ -74,7 +74,7 @@ class ImageCleanModel(BaseModel):
 
         if self.is_train:
             self.init_training_settings()
-
+        
     def init_training_settings(self):
         self.net_g.train()
         train_opt = self.opt['train']
@@ -154,13 +154,18 @@ class ImageCleanModel(BaseModel):
 
         self.output = preds[-1]
 
-        loss_dict = OrderedDict()
+        
         # pixel loss
         l_pix = 0.
         for pred in preds:
-            l_pix += self.cri_pix(pred, self.gt)
+            loss, sub_loss_dict = self.cri_pix(pred, self.gt)
+            l_pix += loss
 
+        loss_dict = OrderedDict()
         loss_dict['l_pix'] = l_pix
+        if sub_loss_dict is not None:
+            for key, value in sub_loss_dict.items():
+                loss_dict['l_'+key] = value
 
         l_pix.backward()
         if self.opt['train']['use_grad_clip']:

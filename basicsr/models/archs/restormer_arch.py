@@ -74,13 +74,11 @@ class LayerNorm(nn.Module):
 class DenseLayer(nn.Module):
     def __init__(self, nChannels, growthRate, kernel_size=1):
         super(DenseLayer, self).__init__()
-        #self.conv = nn.Conv2d(nChannels, growthRate, kernel_size=kernel_size, padding=(kernel_size - 1) // 2,
-                              #bias=False)
+        
         self.conv = nn.Sequential(
             nn.Conv2d(nChannels, growthRate, kernel_size=kernel_size, padding=(kernel_size - 1) // 2,
                               bias=False),nn.BatchNorm2d(growthRate)
         )
-        self.bat = nn.BatchNorm2d(growthRate),
         self.leaky=nn.LeakyReLU(0.1,inplace=True)
 
     def forward(self, x):
@@ -215,10 +213,13 @@ class LowFrequencyBlock(nn.Module):
     def __init__(self,
         channels, 
         nDenselayer=1, 
-        growthRate=16   
+        growthRate=16,
+        LayerNorm_type='WithBias'
     ):
         super(LowFrequencyBlock, self).__init__()
         
+        # self.norm = LayerNorm(channels, LayerNorm_type)
+
         denseLayers_1 = []
         channels_1 = channels
         for i in range(nDenselayer):
@@ -234,11 +235,22 @@ class LowFrequencyBlock(nn.Module):
             channels_2 += growthRate
         denseLayers_2.append(nn.Conv2d(channels_2, channels, 1))
         self.phase_branch = nn.Sequential(*denseLayers_2)
+        
+        denseLayers_3 = []
+        channels_3 = channels
+        for i in range(nDenselayer):
+            denseLayers_3.append(DenseLayer(channels_3, growthRate))
+            channels_3 += growthRate
+        denseLayers_3 += [
+                          nn.Conv2d(channels_3, channels, 1),
+                          nn.Conv2d(channels, channels, 3, 1, 1, groups=channels),
+                          nn.Sigmoid()]
+        self.mask_branch = nn.Sequential(*denseLayers_3)        
     
     def forward(self, x):
         _, _, H, W = x.shape
-        X_fft = torch.fft.fft2(x, norm='backward')
         
+        X_fft = torch.fft.fft2(x, norm='backward')
         magnitude = torch.abs(X_fft)
         log_magnitude = torch.log1p(magnitude)
         phase = torch.angle(X_fft) 
@@ -251,8 +263,9 @@ class LowFrequencyBlock(nn.Module):
         imag = magnitude * torch.sin(phase)
         
         x_out = torch.complex(real, imag)
-        out = torch.fft.irfft2(x_out, s=(H, W), norm='backward')
-        out = out
+        out = torch.fft.ifft2(x_out, s=(H, W), norm='backward').real
+        out = self.mask_branch(out) * out
+        out = out + x
 
         return out
 
@@ -298,10 +311,14 @@ class HighFrequencyBlock_02(nn.Module):
             nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1, groups=channels),
             nn.Conv2d(channels, channels, kernel_size=1)
         ])
+                
         self.attn = nn.Sequential(*[
             nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1, groups=channels),
             nn.Conv2d(channels, channels, kernel_size=1),
-            nn.Sigmoid()
+            nn.GELU(),
+            nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1, groups=channels),
+            nn.Conv2d(channels, channels, kernel_size=1),
+            nn.Tanh()
         ])
         self.split_conv  = nn.Sequential(*[
             nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1, groups=channels),
@@ -310,11 +327,12 @@ class HighFrequencyBlock_02(nn.Module):
     
     def forward(self, x):
         b, c, n, h, w = x.shape
-        x = rearrange(x, 'b c n h w -> b (c n) h w')
-        x = self.fuse_conv(x)
-        x = x * self.attn(x)
-        x = self.split_conv(x)
-        out = rearrange(x, 'b (c n) h w -> b c n h w', n = n)  # đúng shape (B, C, 3, H, W)
+        out = rearrange(x, 'b c n h w -> b (c n) h w')
+        out = self.fuse_conv(out)
+        out = out * self.attn(out)
+        out = self.split_conv(out)
+        out = rearrange(out, 'b (c n) h w -> b c n h w', n = n)   # đúng shape (B, C, 3, H, W)
+        out = x + x * out
         return out
     
 class DWTBlock(nn.Module):
@@ -323,17 +341,17 @@ class DWTBlock(nn.Module):
         self.norm = LayerNorm(channels, LayerNorm_type)
         self.xfm = DWTForward(J=1, mode='zero', wave='haar')   # DWT
         self.ifm = DWTInverse(mode='zero', wave='haar')        # IDWT
-        # self.high_branch = HighFrequencyBlock_02(channels, num_heads, bias)
+        self.high_branch = HighFrequencyBlock(channels, num_heads, bias)
         self.low_branch = LowFrequencyBlock(channels)
         self.prj_conv = nn.Conv2d(channels, channels, 1)
         
     
     def forward(self, x):
-        x = self.norm(x)
-        x_low, x_high  = self.xfm(x)
-        # out_high = self.high_branch(x_high[0])
+        out = self.norm(x)
+        x_low, x_high  = self.xfm(out)
+        out_high = self.high_branch(x_high[0])
         out_low = self.low_branch(x_low)
-        out = self.ifm((out_low, x_high))
+        out = self.ifm((out_low, [out_high]))
         out = self.prj_conv(out)
         out = out + x
         return out
@@ -344,7 +362,8 @@ class SCFNBlock(nn.Module): # ref: Mishra_U-ENHANCE_Underwater_Image_Enhancement
         hidden_channels = int(channels * ffn_expansion_factor)
         self.norm = LayerNorm(channels, LayerNorm_type)
         self.prj_conv1 = nn.Conv2d(channels, hidden_channels, 1)
-        self.conv = nn.Conv2d(hidden_channels, hidden_channels, 3, 1, 1, groups=hidden_channels)
+        self.conv = nn.Sequential(*[nn.Conv2d(hidden_channels, hidden_channels, 3, 1, 1, groups=hidden_channels),
+                                    nn.Conv2d(hidden_channels, hidden_channels, 1, 1)])
         self.act = nn.GELU()
         self.prj_conv2 = nn.Conv2d(hidden_channels, channels, 1)
     
@@ -370,7 +389,7 @@ class Block(nn.Module):
     
     def forward(self, x):
         out = self.dwtblock(x)
-        out = self.refine(x)
+        out = self.refine(out)
         return out
     
 class WFUWNet(nn.Module):
@@ -402,6 +421,7 @@ class WFUWNet(nn.Module):
         self.middle = Block(channels, num_heads[-1], ffn_expansion_factor, LayerNorm_type, bias)
         
         for i in reversed(range(stages)):
+            print(i)
             channels = channels // 2
             decoder = [
                 Upsample(channels * 2),

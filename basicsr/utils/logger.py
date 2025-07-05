@@ -47,6 +47,7 @@ class MessageLogger():
         epoch = log_vars.pop('epoch')
         current_iter = log_vars.pop('iter')
         lrs = log_vars.pop('lrs')
+        
 
         message = (f'[{self.exp_name[:5]}..][epoch:{epoch:3d}, ' f'iter:{current_iter:8,d}, lr:(')
         for v in lrs:
