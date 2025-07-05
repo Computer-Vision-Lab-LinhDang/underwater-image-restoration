@@ -293,7 +293,7 @@ class BaseModel():
         logger.info(
             f'Loading {net.__class__.__name__} model from {load_path}.')
         load_net = torch.load(
-            load_path, map_location=lambda storage, loc: storage)
+            load_path, map_location=lambda storage, loc: storage, weights_only=True)
         if param_key is not None:
             if param_key not in load_net and 'params' in load_net:
                 param_key = 'params'

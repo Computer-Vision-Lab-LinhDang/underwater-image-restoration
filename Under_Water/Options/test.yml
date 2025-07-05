@@ -1,5 +1,5 @@
 # general settings
-name: WaveletFourierUnderWaterNet
+name: UWNet
 model_type: ImageCleanModel
 scale: 1
 num_gpu: 1  # set num_gpu: 0 for cpu mode
@@ -7,38 +7,6 @@ manual_seed: 100
 
 # dataset and data loader settings
 datasets:
-  train:
-    name: TrainSet
-    type: Dataset_PairedImage
-    dataroot_gt: ./Under_Water/Datasets/EUVP/Paired/total/trainB
-    dataroot_lq: ./Under_Water/Datasets/EUVP/Paired/total/trainA
-    geometric_augs: true
-    filename_tmpl: '{}'
-    io_backend:
-      type: disk
-
-    # data loader
-    use_shuffle: true
-    num_worker_per_gpu: 8
-    batch_size_per_gpu: 8
-
-    ### -------------Progressive training--------------------------
-    # mini_batch_sizes: [8,5,4,2,1,1]             # Batch size per gpu   
-    # iters: [92000,64000,48000,36000,36000,24000]
-    # gt_size: 384   # Max patch size for progressive training
-    # gt_sizes: [128,160,192,256,320,384]  # Patch sizes for progressive training.
-    ### ------------------------------------------------------------
-
-    ### ------- Training on single fixed-patch size 128x128---------
-    mini_batch_sizes: [8]   
-    iters: [300000]
-    gt_size: 256   
-    gt_sizes: [256]
-    ### ------------------------------------------------------------
-
-    dataset_enlarge_ratio: 1
-    prefetch_mode: ~
-
   val:
     name: ValSet
     type: Dataset_PairedImage
@@ -61,7 +29,7 @@ network_g:
 
 # path
 path:
-  pretrain_network_g: ~
+  pretrain_network_g: 'Under_Water/pretrained_models/model_epoch_20.ckpt'
   strict_load_g: true
   resume_state: ~
 
@@ -76,9 +44,9 @@ train:
   # 2nd cycle: cosine annealing (3e-4 to 1e-6) for 208k iters.
   scheduler:
     type: CosineAnnealingRestartCyclicLR
-    periods: [92000, 208000]       
-    restart_weights: [1, 1]
-    eta_mins: [0.0003, 0.000001]   
+    periods: [10000, 82000, 208000]       
+    restart_weights: [1, 1, 1]
+    eta_mins: [0.001, 0.0001, 0.000001]   
 
   mixing_augs:
     mixup: false
@@ -87,19 +55,15 @@ train:
 
   optim_g:
     type: AdamW
-    lr: !!float 3e-4
+    lr: !!float 1e-3
     weight_decay: !!float 1e-4
     betas: [0.9, 0.999]
   
   # losses
   pixel_opt:
-    type: WeightedLoss
-    losses:
-      L1Loss:
-        loss_weight: 1
-        reduction: mean
-    weights: [1]
-    verbose: true 
+    type: L1Loss
+    loss_weight: 1
+    reduction: mean
 
 # validation settings
 val:
@@ -119,8 +83,8 @@ val:
 # logging settings
 logger:
   print_freq: 1000
-  save_checkpoint_freq: !!float 8e3
-  use_tb_logger: false
+  save_checkpoint_freq: !!float 4e3
+  use_tb_logger: true
   wandb:
     project: ~
     resume_id: ~

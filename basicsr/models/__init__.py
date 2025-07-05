@@ -1,5 +1,6 @@
 import importlib
 from os import path as osp
+import torch
 
 from basicsr.utils import get_root_logger, scandir
 
@@ -36,7 +37,7 @@ def create_model(opt):
         raise ValueError(f'Model {model_type} is not found.')
 
     model = model_cls(opt)
-
+    
     logger = get_root_logger()
     logger.info(f'Model [{model.__class__.__name__}] is created.')
     return model

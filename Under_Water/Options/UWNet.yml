@@ -1,8 +1,8 @@
 # general settings
-name: DefocusDeblur_Single_8bit_Restormer
+name: UWnet
 model_type: ImageCleanModel
 scale: 1
-num_gpu: 8  # set num_gpu: 0 for cpu mode
+num_gpu: 1  # set num_gpu: 0 for cpu mode
 manual_seed: 100
 
 # dataset and data loader settings
@@ -10,31 +10,30 @@ datasets:
   train:
     name: TrainSet
     type: Dataset_PairedImage
-    dataroot_gt: ./Defocus_Deblurring/Datasets/train/DPDD/target_crops
-    dataroot_lq: ./Defocus_Deblurring/Datasets/train/DPDD/inputC_crops
+    dataroot_gt: ./Under_Water/Datasets/EUVP/Paired/total/trainB
+    dataroot_lq: ./Under_Water/Datasets/EUVP/Paired/total/trainA
     geometric_augs: true
-
     filename_tmpl: '{}'
     io_backend:
       type: disk
 
     # data loader
     use_shuffle: true
-    num_worker_per_gpu: 8
-    batch_size_per_gpu: 8
+    num_worker_per_gpu: 1
+    batch_size_per_gpu: 1
 
     ### -------------Progressive training--------------------------
-    mini_batch_sizes: [8,5,4,2,1,1]             # Batch size per gpu   
-    iters: [92000,64000,48000,36000,36000,24000]
-    gt_size: 384   # Max patch size for progressive training
-    gt_sizes: [128,160,192,256,320,384]  # Patch sizes for progressive training.
+    # mini_batch_sizes: [8,5,4,2,1,1]             # Batch size per gpu   
+    # iters: [92000,64000,48000,36000,36000,24000]
+    # gt_size: 384   # Max patch size for progressive training
+    # gt_sizes: [128,160,192,256,320,384]  # Patch sizes for progressive training.
     ### ------------------------------------------------------------
 
     ### ------- Training on single fixed-patch size 128x128---------
-    # mini_batch_sizes: [8]   
-    # iters: [300000]
-    # gt_size: 128   
-    # gt_sizes: [128]
+    mini_batch_sizes: [1]   
+    iters: [300000]
+    gt_size: 256   
+    gt_sizes: [256]
     ### ------------------------------------------------------------
 
     dataset_enlarge_ratio: 1
@@ -43,25 +42,15 @@ datasets:
   val:
     name: ValSet
     type: Dataset_PairedImage
-    dataroot_gt: ./Defocus_Deblurring/Datasets/val/DPDD/target_crops
-    dataroot_lq: ./Defocus_Deblurring/Datasets/val/DPDD/inputC_crops
+    dataroot_gt: ./Under_Water/Datasets/EUVP/test_samples/GTr
+    dataroot_lq: ./Under_Water/Datasets/EUVP/test_samples/Inp
     io_backend:
       type: disk
 
 # network structures
 network_g:
-  type: Restormer
-  inp_channels: 3
-  out_channels: 3
-  dim: 48
-  num_blocks: [4,6,6,8]
-  num_refinement_blocks: 4
-  heads: [1,2,4,8]
-  ffn_expansion_factor: 2.66
-  bias: False
-  LayerNorm_type: WithBias
-  dual_pixel_task: False
-
+  type: UWNet
+  num_layers: 3
 
 # path
 path:
@@ -80,10 +69,10 @@ train:
   # 2nd cycle: cosine annealing (3e-4 to 1e-6) for 208k iters.
   scheduler:
     type: CosineAnnealingRestartCyclicLR
-    periods: [92000, 208000]       
-    restart_weights: [1,1]
-    eta_mins: [0.0003,0.000001]   
-  
+    periods: [100000, 200000]       
+    restart_weights: [1, 1]
+    eta_mins: [0.0002, 0.000001]   
+
   mixing_augs:
     mixup: false
     mixup_beta: 1.2
@@ -91,15 +80,21 @@ train:
 
   optim_g:
     type: AdamW
-    lr: !!float 3e-4
+    lr: !!float 2e-4
     weight_decay: !!float 1e-4
     betas: [0.9, 0.999]
   
   # losses
   pixel_opt:
-    type: L1Loss
-    loss_weight: 1
-    reduction: mean
+    type: WeightedLoss
+    losses:
+      L1Loss:
+        reduction: mean
+      VGGLoss:
+        model: vgg16
+        layers: [15]
+    weights: [1, 1]
+    verbose: true 
 
 # validation settings
 val:
@@ -119,8 +114,8 @@ val:
 # logging settings
 logger:
   print_freq: 1000
-  save_checkpoint_freq: !!float 4e3
-  use_tb_logger: true
+  save_checkpoint_freq: !!float 8e3
+  use_tb_logger: false
   wandb:
     project: ~
     resume_id: ~

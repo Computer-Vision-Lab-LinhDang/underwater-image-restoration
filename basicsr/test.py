@@ -29,6 +29,7 @@ def main():
     # create test dataset and dataloader
     test_loaders = []
     for phase, dataset_opt in sorted(opt['datasets'].items()):
+        if phase != 'val': continue
         test_set = create_dataset(dataset_opt)
         test_loader = create_dataloader(
             test_set,
