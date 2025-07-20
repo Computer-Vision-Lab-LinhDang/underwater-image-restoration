@@ -32,6 +32,7 @@ def dynamic_instantiation(modules, cls_type, opt):
     """
 
     for module in modules:
+        print(f"Searching in module: {module.__name__}" )
         cls_ = getattr(module, cls_type, None)
         if cls_ is not None:
             break

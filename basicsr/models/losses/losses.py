@@ -51,8 +51,8 @@ class L1Loss(nn.Module):
             weight (Tensor, optional): of shape (N, C, H, W). Element-wise
                 weights. Default: None.
         """
-        return self.loss_weight * l1_loss(
-            pred, target, weight, reduction=self.reduction)
+        loss = l1_loss(pred, target, weight, reduction=self.reduction)
+        return self.loss_weight * loss
 
 class MSELoss(nn.Module):
     """MSE (L2) loss.
@@ -125,28 +125,35 @@ class CharbonnierLoss(nn.Module):
 
 class EdgeLoss(nn.Module):
     
-    def __init__(self, loss_weight=1.0, reduction='mean'):
-        super(EdgeLoss, self).__init__()
-        if reduction not in ['none', 'mean', 'sum']:
-            raise ValueError(f'Unsupported reduction mode: {reduction}. '
-                             f'Supported ones are: {_reduction_modes}')
-            
-        laplace_kernel = torch.tensor([[0, 1, 0],
-                               [1, -4, 1],
-                               [0, 1, 0]], dtype=torch.float32)
-        laplace_kernel = laplace_kernel.unsqueeze(0).unsqueeze(0)
-        self.laplace_kernel = laplace_kernel.repeat(3, 1, 1, 1)
-        self.eps = 1e-3
-    
-    def forward(self, pred, gt):
-        if self.laplace_kernel.device != pred.device:
-            self.laplace_kernel = self.laplace_kernel.to(pred.device)
-        laplace_pred = F.conv2d(pred, self.laplace_kernel, padding=1, groups=3)
-        laplace_gt = F.conv2d(gt, self.laplace_kernel, padding=1, groups=3)
-        diff = laplace_pred - laplace_gt
-        loss = torch.mean(torch.sqrt((diff * diff) + (self.eps * self.eps)))
         
-        return loss
+    def __init__(self, device='cuda'):
+        super(EdgeLoss, self).__init__()
+        
+        kernel_x = torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=torch.float32).view(1, 1, 3, 3).to(device)
+        kernel_y = torch.tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=torch.float32).view(1, 1, 3, 3).to(device)
+
+        self.register_buffer('kernel_x', kernel_x)
+        self.register_buffer('kernel_y', kernel_y)
+    
+    def to_gray(self, x):
+        """Convert RGB image to grayscale."""
+        return 0.299 * x[:, 0:1, :, :] + 0.587 * x[:, 1:2, :, :] + 0.114 * x[:, 2:3, :, :]
+
+    def forward(self, y_pred, y_true):
+        y_pred_gray = self.to_gray(y_pred)
+        y_true_gray = self.to_gray(y_true)
+
+        grad_pred_x = F.conv2d(y_pred_gray, self.kernel_x, padding=1, stride=1)
+        grad_pred_y = F.conv2d(y_pred_gray, self.kernel_y, padding=1, stride=1)
+        
+        grad_true_x = F.conv2d(y_true_gray, self.kernel_x, padding=1, stride=1)
+        grad_true_y = F.conv2d(y_true_gray, self.kernel_y, padding=1, stride=1)
+        # grad_true = torch.sqrt(grad_true_x**2 + grad_true_y**2)
+
+        loss_x = F.l1_loss(grad_pred_x, grad_true_x)
+        loss_y = F.l1_loss(grad_pred_y, grad_true_y)
+
+        return (loss_x + loss_y) / 2
     
 class VGGLoss(nn.Module):
     """Computes the VGG perceptual loss between two batches of images.
@@ -179,15 +186,13 @@ class VGGLoss(nn.Module):
     device and dtype as their inputs.
     """
 
-    models = {'vgg16': models.vgg16, 'vgg19': models.vgg19}
+    models = {'vgg16': models.vgg16_bn, 'vgg19': models.vgg19_bn}
 
-    def __init__(self, model='vgg16', layers=[8], shift=0, reduction='mean'):
+    def __init__(self, model='vgg16', layers=[15], shift=0, reduction='mean'):
         super().__init__()
         self.shift = shift
         self.reduction = reduction
         self.layers = layers
-        self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                              std=[0.229, 0.224, 0.225])
         self.model = self.models[model](pretrained=True).features[:layers[-1]+1]
         self.model.eval()
         self.model.requires_grad_(False)
@@ -206,7 +211,6 @@ class VGGLoss(nn.Module):
     def forward(self, input, target, target_is_features=False):
         if next(self.model.parameters()).device != input.device:
             self.model = self.model.to(input.device)
-            self.normalize = self.normalize.to(input.device)
         if target_is_features:
             input_feats = self.get_features(input)
             target_feats = target
@@ -220,9 +224,22 @@ class VGGLoss(nn.Module):
         loss = 0.0
         for feat in feats:
             f1, f2 = feat[:sep], feat[sep:]
-            loss += F.mse_loss(f1, f2, reduction=self.reduction)
+            loss += F.l1_loss(f1, f2, reduction=self.reduction)
         return loss / len(feats)
     
+class VGG_loss(nn.Module):
+    
+    models = {'vgg16': models.vgg16_bn, 'vgg19': models.vgg19_bn}
+
+    def __init__(self, model, device='cuda'):
+        super(VGG_loss, self).__init__()
+        self.features = nn.Sequential(*list(self.models[model](pretrained=True).children())[0][:-3]).to(device)
+        
+    def forward(self, pred, gt):
+        y_pred = self.features(pred)
+        y_gt = self.features(gt)
+        loss = F.l1_loss(y_pred, y_gt, reduction='mean')
+        return loss
 class Lambda(nn.Module):
     """Wraps a callable in an :class:`nn.Module` without registering it."""
 
@@ -236,6 +253,7 @@ class Lambda(nn.Module):
 LOSS_REGISTRY = {
     'L1Loss': L1Loss,
     'MSELoss': MSELoss,
+    'VGG_loss': VGG_loss,
     'VGGLoss': VGGLoss,
     'EdgeLoss': EdgeLoss,
 }
@@ -263,3 +281,5 @@ class WeightedLoss(nn.ModuleList):
         if self.verbose:
             return sum(losses), self._losses_info(losses)
         return sum(losses), None
+
+

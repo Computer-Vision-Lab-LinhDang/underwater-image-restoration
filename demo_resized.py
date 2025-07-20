@@ -12,7 +12,7 @@
 import torch
 import torch.nn.functional as F
 import torchvision.transforms.functional as TF
-
+import torchvision.transforms as transforms
 import os
 from runpy import run_path
 from skimage import img_as_ubyte
@@ -47,7 +47,7 @@ def save_gray_img(filepath, img):
 
 def get_weights_and_parameters(task, parameters):
     if task == 'UnderWater':
-        weights = os.path.join('Under_Water', 'pretrained_models', 'net03.pth')
+        weights = os.path.join('Under_Water', 'pretrained_models', 'model.pth')
     return weights, parameters
 
 task    = args.task
@@ -70,7 +70,7 @@ if len(files) == 0:
     raise Exception(f'No files found at {inp_dir}')
 
 # Get model weights and parameters
-parameters = {'inp_channels': 3, 'out_channels': 3, 'dim': 32, 'num_heads': [1,2,4,8], 'ffn_expansion_factor': 2, 'stages': 2, 'bias': False, 'LayerNorm_type': 'WithBias'}
+parameters = {'inp_channels': 3, 'out_channels': 3, 'dim': 32,'ffn_expansion_factor': 2, 'stages': 2, 'LayerNorm_type': 'WithBias'}
 weights, parameters = get_weights_and_parameters(task, parameters)
 
 load_arch = run_path(os.path.join('basicsr', 'models', 'archs', 'underwater_arch.py'))
@@ -87,7 +87,11 @@ img_multiple_of = 8
 
 print(f"\n ==> Running {task} with weights {weights}\n ")
 
+fps_list = []
+inference_times = []
+
 with torch.no_grad():
+    length = len(files)
     for file_ in tqdm(files):
         if torch.cuda.is_available():
             torch.cuda.ipc_collect()
@@ -95,31 +99,25 @@ with torch.no_grad():
 
         import time
 
-        # start = time.time()
         img = load_img(file_)
-        # elapsed = time.time() - start
 
-        # fps = 1 / elapsed
-        # print(f"FPS: {fps:.2f}")
+
 
         input_ = torch.from_numpy(img).float().div(255.).permute(2,0,1).unsqueeze(0).to(device)
 
-        # Pad the input if not_multiple_of 8
-        height,width = input_.shape[2], input_.shape[3]
-        H,W = ((height+img_multiple_of)//img_multiple_of)*img_multiple_of, ((width+img_multiple_of)//img_multiple_of)*img_multiple_of
-        padh = H-height if height%img_multiple_of!=0 else 0
-        padw = W-width if width%img_multiple_of!=0 else 0
-        input_ = F.pad(input_, (0,padw,0,padh), 'reflect')
-
-        if args.tile is None:
-            ## Testing on the original resolution image
-            restored = model(input_)
-
+        input_ = transforms.Resize((256, 256))(input_)
+                ## Testing on the original resolution image
+                
+        start = time.time()
+        restored = model(input_)
+        elapsed = time.time() - start
+        fps = 1 / elapsed
+        fps_list.append(fps)
+        inference_times.append(elapsed)
+        
         restored = torch.clamp(restored, 0, 1)
 
         # Unpad the output
-        restored = restored[:,:,:height,:width]
-
         restored = restored.permute(0, 2, 3, 1).cpu().detach().numpy()
         restored = img_as_ubyte(restored[0])
 
@@ -127,5 +125,6 @@ with torch.no_grad():
         # stx()
         
         save_img((os.path.join(out_dir, f+'.png')), restored)
-
+    print(f"\nAverage FPS: {np.mean(fps_list):.2f}")
+    print(f"Average Inference Time: {np.mean(inference_times):.4f} seconds")
     print(f"\nRestored images are saved at {out_dir}")

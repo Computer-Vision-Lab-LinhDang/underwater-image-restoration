@@ -2,6 +2,7 @@ import cv2
 import random
 import numpy as np
 
+
 def mod_crop(img, scale):
     """Mod crop images, used during testing.
 
@@ -273,3 +274,20 @@ def random_augmentation(*args):
     for data in args:
         out.append(data_augmentation(data, flag_aug).copy())
     return out
+
+def paired_resize(img_gt, img_lq, size):
+    """Resize paired images to a given size.
+
+    Args:
+        img_gt (ndarray): GT image.
+        img_lq (ndarray): LQ image.
+        size (int): Target size (height, width).
+
+    Returns:
+        tuple[ndarray]: Resized GT and LQ images.
+    """
+    size = (size, size) if isinstance(size, int) else size
+    img_gt = cv2.resize(img_gt, size, interpolation=cv2.INTER_CUBIC
+)
+    img_lq = cv2.resize(img_lq, size, interpolation=cv2.INTER_CUBIC)
+    return img_gt, img_lq

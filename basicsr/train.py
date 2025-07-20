@@ -286,7 +286,7 @@ def main():
                 log_vars.update({'lrs': model.get_current_learning_rate()})
                 log_vars.update({'time': iter_time, 'data_time': data_time})
                 for key, value in losses_log.items():
-                    log_vars[key] = value / opt['logger']['print_freq']
+                    log_vars[key] = value / (opt['logger']['print_freq'])
                 log_vars.update(losses_log)
                 msg_logger(log_vars)
                 # reset log
