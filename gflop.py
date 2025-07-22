@@ -12,8 +12,7 @@
 import torch
 import torch.nn.functional as F
 import torchvision.transforms.functional as TF
-from ptflops import get_model_complexity_info
-from fvcore.nn import FlopCountAnalysis, parameter_count
+from calflops import calculate_flops
 
 import os
 from runpy import run_path
@@ -45,11 +44,6 @@ model.load_state_dict(checkpoint['params'])
 model.eval()
 model = model.cpu()
 print(f"\n ==> Running {task} with weights {weights}\n ")
-inputs = torch.randn((1, 3, 256, 256))
-with torch.cuda.device(0):  # hoặc bỏ nếu không dùng GPU
-    flops = FlopCountAnalysis(model, inputs)
-    params = parameter_count(model)
-
-# In ra kết quả
-print(f"FLOPs: {flops.total() / 1e9:.2f} GFlops")
-print(f"Params: {params[''] / 1e6:.2f} M")
+flops, macs_netG_HR, params_netG_HR = calculate_flops(model=model,input_shape=(1, 3, 256, 256), print_results=False)
+print(flops, macs_netG_HR, params_netG_HR)
+print("FLOPS, INFER TIME, PARAMS done!")

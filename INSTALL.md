@@ -31,25 +31,3 @@ python setup.py develop --no_cuda_ext
 
 ### Download datasets from Google Drive
 
-To be able to download datasets automatically you would need `go` and `gdrive` installed. 
-
-1. You can install `go` with the following
-```
-curl -O https://storage.googleapis.com/golang/go1.11.1.linux-amd64.tar.gz
-mkdir -p ~/installed
-tar -C ~/installed -xzf go1.11.1.linux-amd64.tar.gz
-mkdir -p ~/go
-```
-
-2. Add the lines in `~/.bashrc`
-```
-export GOPATH=$HOME/go
-export PATH=$PATH:$HOME/go/bin:$HOME/installed/go/bin
-```
-
-3. Install `gdrive` using
-```
-go get github.com/prasmussen/gdrive
-```
-
-4. Close current terminal and open a new terminal. 

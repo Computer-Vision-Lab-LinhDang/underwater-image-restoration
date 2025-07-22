@@ -1,1 +1,1 @@
-python gflop.py --input_dir Dataset/'testset(ref)'/test-LSUI/input/ --result_dir demo/LSUI/ --task UnderWater
+python demo_resized.py --input_dir ../Dataset/'testset(ref)'/test-UIEB/input/ --result_dir demo/UIEB/ --task UnderWater

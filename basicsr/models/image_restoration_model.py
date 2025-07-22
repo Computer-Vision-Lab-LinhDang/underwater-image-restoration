@@ -295,7 +295,7 @@ class ImageCleanModel(BaseModel):
                                 metric_module, metric_type)(visuals['result'], visuals['gt'], **opt_)
                         else:
                             self.metric_results[name] += getattr(
-                                metric_module, metric_type)(visuals['gt'], **opt_)
+                                metric_module, metric_type)(visuals['result'], **opt_)
 
             cnt += 1
 
