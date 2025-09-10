@@ -287,7 +287,7 @@ def paired_resize(img_gt, img_lq, size):
         tuple[ndarray]: Resized GT and LQ images.
     """
     size = (size, size) if isinstance(size, int) else size
-    img_gt = cv2.resize(img_gt, size, interpolation=cv2.INTER_CUBIC
+    img_gt = cv2.resize(img_gt, size, interpolation=cv2.INTER_LINEAR
 )
-    img_lq = cv2.resize(img_lq, size, interpolation=cv2.INTER_CUBIC)
+    img_lq = cv2.resize(img_lq, size, interpolation=cv2.INTER_LINEAR)
     return img_gt, img_lq

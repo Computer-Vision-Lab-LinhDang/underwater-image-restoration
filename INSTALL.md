@@ -1,18 +1,18 @@
 # Installation
 
-This repository is built in PyTorch 1.8.1 and tested on Ubuntu 16.04 environment (Python3.7, CUDA10.2, cuDNN7.6).
+This repository is built in PyTorch 11.8.1 and tested on Ubuntu 16.04 environment (Python3.10, CUDA12.3, cuDNN7.6).
 Follow these intructions
 
 1. Clone our repository
 ```
-git clone https://github.com/swz30/Restormer.git
-cd Restormer
+git clone https://github.com/Computer-Vision-Lab-LinhDang/underwater-image-restoration.git
+cd underwater-image-restoration
 ```
 
 2. Make conda environment
 ```
-conda create -n pytorch181 python=3.7
-conda activate pytorch181
+conda create -n underwater python=3.10
+conda activate underwater
 ```
 
 3. Install dependencies
@@ -22,6 +22,8 @@ pip install matplotlib scikit-learn scikit-image opencv-python yacs joblib natso
 pip install einops gdown addict future lmdb numpy pyyaml requests scipy tb-nightly yapf lpips
 pip install pytorch_wavelets
 pip install PyWavelets
+pip install calflops
+pip install transformer
 ```
 
 4. Install basicsr
@@ -29,5 +31,6 @@ pip install PyWavelets
 python setup.py develop --no_cuda_ext
 ```
 
-### Download datasets from Google Drive
+### Datasets
 
+Datasets 

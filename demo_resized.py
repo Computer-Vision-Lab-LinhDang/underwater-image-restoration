@@ -1,14 +1,3 @@
-## Restormer: Efficient Transformer for High-Resolution Image Restoration
-## Syed Waqas Zamir, Aditya Arora, Salman Khan, Munawar Hayat, Fahad Shahbaz Khan, and Ming-Hsuan Yang
-## https://arxiv.org/abs/2111.09881
-
-##--------------------------------------------------------------
-##------- Demo file to test Restormer on your own images---------
-## Example usage on directory containing several images:   python demo.py --task Single_Image_Defocus_Deblurring --input_dir './demo/degraded/' --result_dir './demo/restored/'
-## Example usage on a image directly: python demo.py --task Single_Image_Defocus_Deblurring --input_dir './demo/degraded/portrait.jpg' --result_dir './demo/restored/'
-## Example usage with tile option on a large image: python demo.py --task Single_Image_Defocus_Deblurring --input_dir './demo/degraded/portrait.jpg' --result_dir './demo/restored/' --tile 720 --tile_overlap 32
-##--------------------------------------------------------------
-
 import torch
 import torch.nn.functional as F
 import torchvision.transforms.functional as TF
@@ -47,7 +36,7 @@ def save_gray_img(filepath, img):
 
 def get_weights_and_parameters(task, parameters):
     if task == 'UnderWater':
-        weights = os.path.join('Under_Water', 'pretrained_models', 'model.pth')
+        weights = os.path.join('Under_Water', 'pretrained_models', 'net_g.pth')
     return weights, parameters
 
 task    = args.task
@@ -82,9 +71,6 @@ model.to(device)
 checkpoint = torch.load(weights)
 model.load_state_dict(checkpoint['params'])
 model.eval()
-
-img_multiple_of = 8
-
 print(f"\n ==> Running {task} with weights {weights}\n ")
 
 fps_list = []
@@ -92,6 +78,7 @@ inference_times = []
 
 with torch.no_grad():
     length = len(files)
+    
     for file_ in tqdm(files):
         if torch.cuda.is_available():
             torch.cuda.ipc_collect()
@@ -101,20 +88,17 @@ with torch.no_grad():
 
         img = load_img(file_)
 
-
-
         input_ = torch.from_numpy(img).float().div(255.).permute(2,0,1).unsqueeze(0).to(device)
 
         input_ = transforms.Resize((256, 256))(input_)
                 ## Testing on the original resolution image
                 
-        start = time.time()
+        start = time.perf_counter()
         restored = model(input_)
-        elapsed = time.time() - start
+        elapsed = time.perf_counter() - start
         fps = 1 / elapsed
         fps_list.append(fps)
         inference_times.append(elapsed)
-        
         restored = torch.clamp(restored, 0, 1)
 
         # Unpad the output
@@ -125,6 +109,6 @@ with torch.no_grad():
         # stx()
         
         save_img((os.path.join(out_dir, f+'.png')), restored)
-    print(f"\nAverage FPS: {np.mean(fps_list):.2f}")
-    print(f"Average Inference Time: {np.mean(inference_times):.4f} seconds")
+    print(f"\nAverage FPS: {1/np.mean(inference_times[1:]):.2f}")
+    print(f"Average Inference Time: {np.mean(inference_times[1:]):.4f} seconds")
     print(f"\nRestored images are saved at {out_dir}")

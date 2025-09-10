@@ -1,1 +1,1 @@
-python demo_resized.py --input_dir ../Dataset/'testset(ref)'/test-UIEB/input/ --result_dir demo/UIEB/ --task UnderWater
+python demo_resized.py --input_dir /home/linhdang/workspace/kien_workspace/underwater/underwater/S-UODAC2020/VOC2007/JPEGImages --result_dir demo/VOC2007/ --task UnderWater
