@@ -19,6 +19,7 @@ Pre-trained model can be found at Under_Water/pretrained_models
 ## Demo
 
 To demo the pre-trained model, you can command line as following:
+<<<<<<< HEAD
 ```
 python demo.py --task Under_Water 
 --input_dir path_to_images 
@@ -30,4 +31,15 @@ sh demo.sh
 ```
 Note: You have to change the paths in demo.sh
 
-## Evaluation
+=======
+```
+python demo.py --task Under_Water 
+--input_dir path_to_images 
+--result_dir save_images_here
+```
+or:
+```
+sh demo.sh
+```
+Note: You have to change the paths in demo.sh
+
