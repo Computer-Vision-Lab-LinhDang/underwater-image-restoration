@@ -33,6 +33,33 @@ datasets:
     io_backend:
       type: disk
 
+  # val_4:
+  #   name: EUVPSet-unpaired
+  #   type: Dataset_PairedImage
+  #   dataroot_gt: ../Dataset/testset(non-ref)/test-EUVP-unpaired/input
+  #   dataroot_lq: ../Dataset/testset(non-ref)/test-EUVP-unpaired/input
+  #   gt_size: 256   
+  #   io_backend:
+  #     type: disk
+
+  # val_5:
+  #   name: UIEBSet-unpaired
+  #   type: Dataset_PairedImage
+  #   dataroot_gt: ../Dataset/testset(non-ref)/test-UIEB-unpaired/
+  #   dataroot_lq: ../Dataset/testset(non-ref)/test-UIEB-unpaired/
+  #   gt_size: 256   
+  #   io_backend:
+  #     type: disk
+
+  # val_6:
+  #   name: RUIESet-unpaired
+  #   type: Dataset_PairedImage
+  #   dataroot_gt: ../Dataset/testset(non-ref)/test-RUIE-unpaired/input
+  #   dataroot_lq: ../Dataset/testset(non-ref)/test-RUIE-unpaired/input
+  #   gt_size: 256   
+  #   io_backend:
+  #     type: disk
+
 # network structures
 network_g:
   type: UWNet
@@ -45,7 +72,7 @@ network_g:
 
 # path
 path:
-  pretrain_network_g: 'Under_Water/pretrained_models/model.pth'
+  pretrain_network_g: 'Under_Water/pretrained_models/net.pth'
   strict_load_g: true
   resume_state: ~
 

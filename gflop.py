@@ -25,7 +25,7 @@ import time
 
 def get_weights_and_parameters(task, parameters):
     if task == 'UnderWater':
-        weights = os.path.join('Under_Water', 'pretrained_models', 'model.pth')
+        weights = os.path.join('Under_Water', 'pretrained_models', 'net_g.pth')
     return weights, parameters
 
 # Get model weights and parameters
@@ -42,8 +42,9 @@ model.to(device)
 checkpoint = torch.load(weights)
 model.load_state_dict(checkpoint['params'])
 model.eval()
-model = model.cpu()
+model = model
 print(f"\n ==> Running {task} with weights {weights}\n ")
 flops, macs_netG_HR, params_netG_HR = calculate_flops(model=model,input_shape=(1, 3, 256, 256), print_results=False)
 print(flops, macs_netG_HR, params_netG_HR)
 print("FLOPS, INFER TIME, PARAMS done!")
+

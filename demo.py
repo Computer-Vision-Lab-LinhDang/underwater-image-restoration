@@ -47,7 +47,7 @@ def save_gray_img(filepath, img):
 
 def get_weights_and_parameters(task, parameters):
     if task == 'UnderWater':
-        weights = os.path.join('Under_Water', 'pretrained_models', 'net03.pth')
+        weights = os.path.join('Under_Water', 'pretrained_models', 'model.pth')
     return weights, parameters
 
 task    = args.task
@@ -70,7 +70,7 @@ if len(files) == 0:
     raise Exception(f'No files found at {inp_dir}')
 
 # Get model weights and parameters
-parameters = {'inp_channels': 3, 'out_channels': 3, 'dim': 32, 'num_heads': [1,2,4,8], 'ffn_expansion_factor': 2, 'stages': 2, 'bias': False, 'LayerNorm_type': 'WithBias'}
+parameters = {'inp_channels': 3, 'out_channels': 3, 'dim': 32, 'ffn_expansion_factor': 2, 'stages': 2, 'LayerNorm_type': 'WithBias'}
 weights, parameters = get_weights_and_parameters(task, parameters)
 
 load_arch = run_path(os.path.join('basicsr', 'models', 'archs', 'underwater_arch.py'))
@@ -114,7 +114,6 @@ with torch.no_grad():
         if args.tile is None:
             ## Testing on the original resolution image
             restored = model(input_)
-
         restored = torch.clamp(restored, 0, 1)
 
         # Unpad the output

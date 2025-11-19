@@ -24,6 +24,7 @@ import argparse
 from pdb import set_trace as stx
 import numpy as np
 import time 
+# torch.backends.cudnn.benchmark = True  # Tăng tốc conv ops
 
 parser = argparse.ArgumentParser(description='Test Restormer on your own images')
 parser.add_argument('--input_dir', default='./demo/degraded/', type=str, help='Directory of input images or path of single image')
@@ -47,7 +48,7 @@ def save_gray_img(filepath, img):
 
 def get_weights_and_parameters(task, parameters):
     if task == 'UnderWater':
-        weights = os.path.join('Under_Water', 'pretrained_models', 'model.pth')
+        weights = os.path.join('Under_Water', 'pretrained_models', 'net.pth')
     return weights, parameters
 
 task    = args.task
@@ -77,13 +78,12 @@ load_arch = run_path(os.path.join('basicsr', 'models', 'archs', 'underwater_arch
 model = load_arch['UWNet'](**parameters)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = 'cpu'
 model.to(device)
 
 checkpoint = torch.load(weights)
-model.load_state_dict(checkpoint['params'])
+model.load_state_dict(checkpoint['params'], strict=True)
 model.eval()
-
-img_multiple_of = 8
 
 print(f"\n ==> Running {task} with weights {weights}\n ")
 
@@ -98,33 +98,32 @@ with torch.no_grad():
             torch.cuda.empty_cache()
 
         import time
-
+        gt_files = file_.replace('input', 'target')
         img = load_img(file_)
+        gt = load_img(file_)
 
-
-
-        input_ = torch.from_numpy(img).float().div(255.).permute(2,0,1).unsqueeze(0).to(device)
-
-        input_ = transforms.Resize((256, 256))(input_)
+        input_ = cv2.resize(img, (256, 256), interpolation=cv2.INTER_LINEAR)
+        gt = cv2.resize(gt, (256, 256), interpolation=cv2.INTER_LINEAR)
+        input_ = torch.from_numpy(input_).float().div(255.).permute(2,0,1).unsqueeze(0).to(device)
+        gt = torch.from_numpy(gt).float().div(255.).permute(2,0,1).unsqueeze(0).to(device)
                 ## Testing on the original resolution image
-                
-        start = time.time()
+        start = time.perf_counter()
         restored = model(input_)
-        elapsed = time.time() - start
-        fps = 1 / elapsed
-        fps_list.append(fps)
+        elapsed = time.perf_counter() - start
         inference_times.append(elapsed)
-        
         restored = torch.clamp(restored, 0, 1)
 
         # Unpad the output
         restored = restored.permute(0, 2, 3, 1).cpu().detach().numpy()
+        gt = gt.permute(0, 2, 3, 1).cpu().detach().numpy()
         restored = img_as_ubyte(restored[0])
 
         f = os.path.splitext(os.path.split(file_)[-1])[0]
         # stx()
         
         save_img((os.path.join(out_dir, f+'.png')), restored)
-    print(f"\nAverage FPS: {np.mean(fps_list):.2f}")
-    print(f"Average Inference Time: {np.mean(inference_times):.4f} seconds")
+        gt = img_as_ubyte(gt[0])
+        save_img((os.path.join(out_dir, f+'_gt.png')), gt)
+    print(f"\nAverage FPS: {1/np.mean(inference_times[2:]):.2f}")
+    print(f"Average Inference Time: {np.mean(inference_times[10:]):.4f} seconds")
     print(f"\nRestored images are saved at {out_dir}")

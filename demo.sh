@@ -1,1 +1,1 @@
-python demo_resized.py --input_dir ../Dataset/'testset(ref)'/test-UIEB/input/ --result_dir demo/UIEB/ --task UnderWater
+CUDA_VISIBLE_DEVICES=1 python demo_resized.py --input_dir 'data/Dataset/test/SU-BCOR/' --result_dir demo/Dataset/SU-BCOR --task UnderWater

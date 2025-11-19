@@ -131,6 +131,7 @@ class SpatialAttention(nn.Module):
         super(SpatialAttention, self).__init__()
 
         self.conv1 = nn.Sequential(*[nn.Conv2d(2, 1, kernel_size, padding=kernel_size//2, bias=False)])
+        self.upsize = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
@@ -138,6 +139,7 @@ class SpatialAttention(nn.Module):
         max_out, _ = torch.max(x, dim=1, keepdim=True)
         x = torch.cat([avg_out, max_out], dim=1)
         x = self.conv1(x)
+        x = self.upsize(x)
         return self.sigmoid(x)
 
 class LowFrequencyBlock(nn.Module): # ref: CBAM 
@@ -163,12 +165,12 @@ class LowFrequencyBlock(nn.Module): # ref: CBAM
         
         
 
-    def forward(self, x):
-        out = self.prj1(x)
-        channels_attn = self.ca(out)
-        out = out * channels_attn
+    def forward(self, x, x_low):
+        out1 = self.prj1(x_low)
+        channels_attn = self.ca(out1)
+        out = x * channels_attn
         out = self.prj2(out)
-        spatial_attn = self.sa(out)
+        spatial_attn = self.sa(out1)
         out = out * spatial_attn
         out = out + x
         return out
@@ -225,7 +227,7 @@ class DWTBlock(nn.Module):
         super(DWTBlock, self).__init__()
         self.norm = LayerNorm(channels, LayerNorm_type)
         self.xfm = DWTForward(J=1, mode='zero', wave='haar')   # DWT
-        self.ifm = DWTInverse(mode='zero', wave='haar')        # IDWT
+        # self.ifm = DWTInverse(mode='zero', wave='haar')        # IDWT
         self.high_branch = HighFrequencyBlock(channels, ffn_expansion_factor)
         self.low_branch = LowFrequencyBlock(channels)
         self.prj_conv = nn.Conv2d(channels, channels, 1)
@@ -235,8 +237,7 @@ class DWTBlock(nn.Module):
         out = self.norm(x)
         x_low, x_high  = self.xfm(out)
         mask = self.high_branch(x_high[0])
-        out_low = self.low_branch(x_low)
-        out = self.ifm((out_low, x_high))
+        out = self.low_branch(out, x_low)
         out = mask * out
         out = self.prj_conv(out)
         out = out + x

@@ -1,10 +1,78 @@
-from calflops import calculate_flops
-from models.waternet import WaterNet
-from models.raune_net import RauneNet
-
+import ptwt
 import torch
+from pytorch_wavelets import DWTForward, DWTInverse
 
-model = RauneNet(3, 3, 30, 2)
-flops, macs_netG_HR, params_netG_HR = calculate_flops(model=model,input_shape=(1, 3, 256, 256), print_results=False)
-print(flops, macs_netG_HR, params_netG_HR)
-print("FLOPS, INFER TIME, PARAMS done!")
+xfm = DWTForward(J=1, mode='zero', wave='haar').to('cuda')   # DWT DWT có tham số không
+ifm = DWTInverse(mode='zero', wave='haar').to('cuda')
+import time
+
+x = torch.rand((1, 64, 128, 128)).to('cuda')
+
+start = time.time()
+with torch.no_grad():  # Tắt gradient cho inference
+    coeffs = xfm(x)
+end = time.time()
+
+print(end-start)
+
+with torch.no_grad():  # Tắt gradient cho inference
+    start = time.time()
+    coeffs = xfm(x)
+    end = time.time()
+print("DWTForward time:", end - start)
+# torch.backends.cudnn.benchmark = False  # Tăng tốc conv ops
+start = time.time()
+with torch.no_grad():  # Tắt gradient cho inference
+    coeffs = xfm(x)
+end = time.time()
+print("DWTForward time:", end - start)
+
+with torch.no_grad():  # Tắt gradient cho inference
+    start = time.time()
+    coeffs = xfm(x)
+    end = time.time()
+print("DWTForward time:", end - start)
+
+with torch.no_grad():  # Tắt gradient cho inference
+    start = time.time()
+    coeffs = xfm(x)
+    end = time.time()
+print("DWTForward time:", end - start)
+
+with torch.no_grad():  # Tắt gradient cho inference
+    start = time.time()
+    coeffs = xfm(x)
+    end = time.time()
+print("DWTForward time:", end - start)
+
+with torch.no_grad():  # Tắt gradient cho inference
+    start = time.time()
+    coeffs = xfm(x)
+    end = time.time()
+print("DWTForward time:", end - start)
+
+with torch.no_grad():  # Tắt gradient cho inference
+    start = time.time()
+    coeffs = xfm(x)
+    end = time.time()
+print("DWTForward time:", end - start)
+
+with torch.no_grad():  # Tắt gradient cho inference
+    start = time.time()
+    c = ifm(coeffs)
+    end = time.time()
+print("DWTForward time:", end - start)
+
+
+with torch.no_grad():  # Tắt gradient cho inference
+    start = time.time()
+    c = ifm(coeffs)
+    end = time.time()
+print("DWTForward time:", end - start)
+
+
+with torch.no_grad():  # Tắt gradient cho inference
+    start = time.time()
+    c = ifm(coeffs)
+    end = time.time()
+print("DWTForward time:", end - start)

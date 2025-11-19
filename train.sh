@@ -1,1 +1,1 @@
-python basicsr/train.py -opt Under_Water/Options/underwater.yml
+CUDA_VISIBLE_DEVICES=1 python basicsr/train.py -opt Under_Water/Options/underwater.yml

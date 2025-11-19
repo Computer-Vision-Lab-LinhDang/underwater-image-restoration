@@ -298,7 +298,7 @@ class ImageCleanModel(BaseModel):
                                 metric_module, metric_type)(visuals['result'], **opt_)
 
             cnt += 1
-
+        print("images: ", cnt)
         current_metric = 0.
         if with_metrics:
             for metric in self.metric_results.keys():

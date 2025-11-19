@@ -18,7 +18,8 @@ def calculate_uiqm(img,
     if type(img) == torch.Tensor:
         if len(img.shape) == 4:
             img = img.squeeze(0)
-        img = img.detach().cpu().numpy().transpose(1,2,0)
+        img = img.detach().cpu().numpy().transpose(1,2,0) * 255
     img = reorder_image(img, input_order=input_order)
+
     uiqm = getUIQM(img)
     return uiqm
