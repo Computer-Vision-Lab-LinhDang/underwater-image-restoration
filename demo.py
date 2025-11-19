@@ -47,7 +47,7 @@ def save_gray_img(filepath, img):
 
 def get_weights_and_parameters(task, parameters):
     if task == 'UnderWater':
-        weights = os.path.join('Under_Water', 'pretrained_models', 'model.pth')
+        weights = os.path.join('Under_Water', 'pretrained_models', 'net_g_168000.pth')
     return weights, parameters
 
 task    = args.task
