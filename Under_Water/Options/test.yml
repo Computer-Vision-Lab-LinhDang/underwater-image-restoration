@@ -127,12 +127,6 @@ val:
       type: calculate_ssim
       crop_border: 0
       test_y_channel: false
-    uiqm: # metric name, can be arbitrary
-      reference_metric: false
-      type: calculate_uiqm
-    uciqe: # metric name, can be arbitrary
-      reference_metric: false
-      type: calculate_uciqe
 
 # logging settings
 logger:

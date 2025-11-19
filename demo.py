@@ -47,7 +47,7 @@ def save_gray_img(filepath, img):
 
 def get_weights_and_parameters(task, parameters):
     if task == 'UnderWater':
-        weights = os.path.join('Under_Water', 'pretrained_models', 'net_g_168000.pth')
+        weights = os.path.join('Under_Water', 'pretrained_models', 'net.pth')
     return weights, parameters
 
 task    = args.task
@@ -86,7 +86,7 @@ model.eval()
 img_multiple_of = 8
 
 print(f"\n ==> Running {task} with weights {weights}\n ")
-
+t = 0
 with torch.no_grad():
     for file_ in tqdm(files):
         if torch.cuda.is_available():

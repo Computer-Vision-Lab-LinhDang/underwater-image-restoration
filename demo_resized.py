@@ -1,14 +1,3 @@
-## Restormer: Efficient Transformer for High-Resolution Image Restoration
-## Syed Waqas Zamir, Aditya Arora, Salman Khan, Munawar Hayat, Fahad Shahbaz Khan, and Ming-Hsuan Yang
-## https://arxiv.org/abs/2111.09881
-
-##--------------------------------------------------------------
-##------- Demo file to test Restormer on your own images---------
-## Example usage on directory containing several images:   python demo.py --task Single_Image_Defocus_Deblurring --input_dir './demo/degraded/' --result_dir './demo/restored/'
-## Example usage on a image directly: python demo.py --task Single_Image_Defocus_Deblurring --input_dir './demo/degraded/portrait.jpg' --result_dir './demo/restored/'
-## Example usage with tile option on a large image: python demo.py --task Single_Image_Defocus_Deblurring --input_dir './demo/degraded/portrait.jpg' --result_dir './demo/restored/' --tile 720 --tile_overlap 32
-##--------------------------------------------------------------
-
 import torch
 import torch.nn.functional as F
 import torchvision.transforms.functional as TF
@@ -84,7 +73,6 @@ model.to(device)
 checkpoint = torch.load(weights)
 model.load_state_dict(checkpoint['params'], strict=True)
 model.eval()
-
 print(f"\n ==> Running {task} with weights {weights}\n ")
 
 fps_list = []
@@ -92,6 +80,7 @@ inference_times = []
 
 with torch.no_grad():
     length = len(files)
+    
     for file_ in tqdm(files):
         if torch.cuda.is_available():
             torch.cuda.ipc_collect()
