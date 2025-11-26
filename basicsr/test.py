@@ -29,7 +29,7 @@ def main():
     # create test dataset and dataloader
     test_loaders = []
     for phase, dataset_opt in sorted(opt['datasets'].items()):
-        if phase != 'val': continue
+        if 'val' not in phase: continue
         test_set = create_dataset(dataset_opt)
         test_loader = create_dataloader(
             test_set,
@@ -41,7 +41,8 @@ def main():
         logger.info(
             f"Number of test images in {dataset_opt['name']}: {len(test_set)}")
         test_loaders.append(test_loader)
-
+    logger.info(
+            f"Number of test datasets: {len(test_loaders)}")
     # create model
     model = create_model(opt)
 

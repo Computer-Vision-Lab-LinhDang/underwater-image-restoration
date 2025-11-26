@@ -37,10 +37,6 @@ def create_model(opt):
         raise ValueError(f'Model {model_type} is not found.')
 
     model = model_cls(opt)
-<<<<<<< HEAD
-=======
-    
->>>>>>> 856359ed4644e6c6ad84152e13468e59029e8088
     logger = get_root_logger()
     logger.info(f'Model [{model.__class__.__name__}] is created.')
     return model
